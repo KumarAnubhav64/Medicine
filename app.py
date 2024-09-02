@@ -1,6 +1,8 @@
 import pickle
 from flask import Flask, request, jsonify
 
+
+
 # Load the model from the pickle file
 model_filename = './models/pipe.pkl'
 try:
