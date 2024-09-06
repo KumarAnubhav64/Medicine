@@ -1,7 +1,6 @@
 import pickle
 from flask import Flask, request, jsonify
-
-
+from pymongo import MongoClient
 
 # Load the model from the pickle file
 model_filename = './models/pipe.pkl'
@@ -15,7 +14,12 @@ except Exception as e:
 # Initialize Flask app
 app = Flask(__name__)
 
-# Define an endpoint for prediction
+# Connect to MongoDB
+client = MongoClient('mongodb://localhost:27017/')  # Update with your MongoDB connection URI if different
+db = client['hospitalDb']  # Your database name
+hospitals_collection = db['hospitals']  # Your collection name
+
+# Define an endpoint for prediction based on hospital name
 @app.route('/api/predict', methods=['POST'])
 def predict():
     if model is None:
@@ -23,21 +27,38 @@ def predict():
 
     try:
         data = request.json
-        amount = data.get('amount')
-        consumption_average = data.get('consumption_average')
+        hospital_name = data.get('hospital_name')
 
-        # Validate inputs
-        if amount is None or consumption_average is None:
-            return jsonify({'error': 'Invalid input, please provide both amount and consumption_average'}), 400
+        if not hospital_name:
+            return jsonify({'error': 'Invalid input, please provide a hospital_name'}), 400
 
-        # Make prediction
+        # Fetch hospital data from MongoDB
+        hospital = hospitals_collection.find_one({'hospital_name': hospital_name})
+
+        if not hospital:
+            return jsonify({'error': 'Hospital not found'}), 404
+
+        # Get the first medicine's quantity and consumption_rate (modify as per your logic)
+        if len(hospital['medicines']) == 0:
+            return jsonify({'error': 'No medicines found for this hospital'}), 404
+
+        medicine = hospital['medicines'][0]  # Taking the first medicine for simplicity
+        amount = medicine['quantity']
+        consumption_average = medicine['consumption_rate']
+
+        # Make prediction using the amount and consumption_average from the first medicine
         prediction = model.predict([[amount, consumption_average]])
 
-        # Return the prediction as a JSON response
-        return jsonify({'predicted_days': prediction[0]})
+        # Return the prediction along with the hospital and medicine data
+        return jsonify({
+            'hospital_name': hospital_name,
+            'medicine': medicine,
+            'predicted_days': prediction[0]
+        })
 
     except Exception as e:
         return jsonify({'error': f"An error occurred: {str(e)}"}), 500
+
 
 # Run the app
 if __name__ == '__main__':
