@@ -39,32 +39,37 @@ def predict():
         if not hospital:
             return jsonify({'error': 'Hospital not found'}), 404
 
-        # Get the first medicine's quantity and consumption_rate (modify as per your logic)
-        if len(hospital['medicines']) == 0:
-            return jsonify({'error': 'No medicines found for this hospital'}), 404
+        # Iterate over each medicine in the hospital
+        predictions = []
+        for medicine in hospital['medicines']:
+            amount = medicine['quantity']
+            consumption_average = medicine['consumption_rate']
 
-        medicine = hospital['medicines'][0]  # Taking the first medicine for simplicity
-        amount = medicine['quantity']
-        consumption_average = medicine['consumption_rate']
+            # Make prediction using the amount and consumption_average for each medicine
+            prediction = model.predict([[amount, consumption_average]])
+            predicted_days = int(prediction[0])  # Ensure prediction is an integer
 
-        # Make prediction using the amount and consumption_average from the first medicine
-        prediction = model.predict([[amount, consumption_average]])
-        predicted_days = int(prediction[0])  # Ensure prediction is an integer
+            # Calculate expiry date
+            today = datetime.today()
+            expiry_date = today + timedelta(days=predicted_days)
 
-        # Calculate expiry date
-        today = datetime.today()
-        expiry_date = today + timedelta(days=predicted_days)
+            # Check if the medicine is predicted to expire soon
+            is_expired = expiry_date <= today
 
-        # Check if the medicine is predicted to expire soon (based on today's date)
-        is_expired = expiry_date <= today
+            # Append the prediction data to the list
+            predictions.append({
+                'name': medicine['name'],
+                'quantity': amount,
+                'consumption_rate': consumption_average,
+                'predicted_days': predicted_days,
+                'expiry_date': expiry_date.strftime('%Y-%m-%d'),
+                'is_expired': is_expired
+            })
 
-        # Return the prediction along with the hospital and medicine data
+        # Return the prediction results along with the hospital name
         return jsonify({
             'hospital_name': hospital_name,
-            'medicine': medicine,
-            'predicted_days': predicted_days,
-            'expiry_date': expiry_date.strftime('%Y-%m-%d'),
-            'is_expired': is_expired
+            'predictions': predictions
         })
 
     except Exception as e:
