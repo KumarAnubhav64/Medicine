@@ -1,6 +1,7 @@
 import pickle
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
+from datetime import datetime, timedelta
 
 # Load the model from the pickle file
 model_filename = './models/pipe.pkl'
@@ -48,17 +49,26 @@ def predict():
 
         # Make prediction using the amount and consumption_average from the first medicine
         prediction = model.predict([[amount, consumption_average]])
+        predicted_days = int(prediction[0])  # Ensure prediction is an integer
+
+        # Calculate expiry date
+        today = datetime.today()
+        expiry_date = today + timedelta(days=predicted_days)
+
+        # Check if the medicine is predicted to expire soon (based on today's date)
+        is_expired = expiry_date <= today
 
         # Return the prediction along with the hospital and medicine data
         return jsonify({
             'hospital_name': hospital_name,
             'medicine': medicine,
-            'predicted_days': prediction[0]
+            'predicted_days': predicted_days,
+            'expiry_date': expiry_date.strftime('%Y-%m-%d'),
+            'is_expired': is_expired
         })
 
     except Exception as e:
         return jsonify({'error': f"An error occurred: {str(e)}"}), 500
-
 
 # Run the app
 if __name__ == '__main__':
